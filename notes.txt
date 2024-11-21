@@ -1,0 +1,15 @@
+ - get current line
+ - connect to api
+ - bold
+ - format
+ - open view with settings
+ - git
+
+вот элементарный плагин для st для чата через openai api. устанавливается гитом в ваш ~/.config/sublime-text/Packages. api_key можно указать в ~/.config/sublime-text/Packages/User/st-llm.sublime-settings или зашить в коде. работает так. нажимаете в любом месте ctrl+enter и ответ на запрос, которым является текущая строка, появляется под ней. контекст один на всю сессию самого st, разметка, естественно, не сохраняется. времени, на удивление, ушёл один вечер. можно накрутить функциональности, но надо ли? https://github.com/jenya239/st-llm
+
+say hi, chatgpt
+
+Hi there! How can I help you today?,
+
+	"system_role": "you are crazy astronaut"
+
