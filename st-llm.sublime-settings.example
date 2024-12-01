@@ -1,11 +1,15 @@
 {
 	"openai": {
 		"key": "",
-		"model": "gpt-4o-mini"
+		"model": "gpt-4o-mini",
+		"color": "cyanish",
+		"color_code": "#2AA198"
 	},
 	"anthropic": {
 		"key": "",
-		"model": "claude-3-5-sonnet-20241022"
+		"model": "claude-3-5-sonnet-20241022",
+		"color": "orangish",
+		"color_code": "#B58900"
 	},
-	"active_provider": "openai",
+	"active_provider": "anthropic",
 }

@@ -4,45 +4,35 @@ import random, string
 import json
 import http.client
 
+default_port = 443
 default_provider = "openai"
 default_model = "gpt-4o-mini"
 default_system_role = "You are a helpful assistant. Provide very short answers with one or two lines. Always provide code blocks as raw text without surrounding them with backtricks. Please answer without backtricks"
 default_color = "cyanish"
 default_color_code = "#2AA198"
 
-class OpenAIChatAPI:
-	def __init__(self, api_key):
-		self.api_key = api_key
-		self.conn = http.client.HTTPSConnection("api.openai.com")
+class Provider:
+	def __init__(self, name, host, url, port=default_port):
+		self.name = name
+		self.api_key = ""
+		self.url = url
+		self.model_name = ""
+		self.conn = http.client.HTTPSConnection(host, port)
 		self.system_role = None
 		self.set_system_role(default_system_role)
 
 	def set_system_role(self, system_role):
 		if self.system_role != system_role:
 			self.system_role = system_role
-			self.messages = [
-				{"role": "system", "content": system_role}
-			]
+			self.init_messages()
 
-	def send_request(self, model=model_name, messages=None):
-		if messages is None:
-			messages = [
-				{"role": "system", "content": default_system_role}
-			]
-		
-		headers = {
-			"Authorization": "Bearer {}".format(self.api_key),
-			"Content-Type": "application/json"
-		}
-		
-		data = {
-			"model": model,
-			"messages": messages
-		}
-		
+	def send_request(self):
+		headers = self.get_headers()
+		data = self.get_data()
+
 		json_data = json.dumps(data)
 		
-		self.conn.request("POST", "/v1/chat/completions", body=json_data, headers=headers)
+		self.conn.request("POST", self.url, body=json_data, headers=headers)
 		
 		response = self.conn.getresponse()
 		response_data = response.read()
@@ -50,67 +40,60 @@ class OpenAIChatAPI:
 		self.conn.close()
 		
 		response_json = json.loads(response_data.decode("utf-8"))
-		return response_json["choices"][0]["message"]["content"]
+		return self.get_answer(response_json)
 
 	def chat(self, message):
 		# print(self.messages)
 		self.messages.append({ "role": "user", "content": message })
-		answer = self.send_request(model_name, self.messages)
+		answer = self.send_request()
 		self.messages.append({ "role": "assistant", "content": answer })
 		return answer
 
-class AnthropicAPI:
-	def __init__(self, api_key):
-		self.api_key = api_key
-		self.conn = http.client.HTTPSConnection("api.anthropic.com")
-		self.system_role = None
-		self.set_system_role(default_system_role)
+class OpenAIChatAPI(Provider):
+	def init_messages(self):
+		self.messages = [
+			{"role": "system", "content": self.system_role}
+		]
 
-	def set_system_role(self, system_role):
-		if self.system_role != system_role:
-			self.system_role = system_role
-			self.messages = []
-
-	def send_request(self, model=model_name, messages=None):
-		if messages is None:
-			messages = []
-		
-		headers = {
+	def get_headers(self):
+		return {
 			"Authorization": "Bearer {}".format(self.api_key),
+			"Content-Type": "application/json"
+		}
+
+	def get_data(self):
+		return {
+			"model": self.model_name,
+			"messages": self.messages
+		}
+
+	def get_answer(self, response_json):
+		return response_json["choices"][0]["message"]["content"]
+
+class AnthropicAPI(Provider):
+	def init_messages(self):
+		self.messages = []
+
+	def get_headers(self):
+		return {
 			"anthropic-version": "2023-06-01",
 			"Content-Type": "application/json",
 			"x-api-key": self.api_key,
 		}
-		
-		data = {
-			"model": model,
+
+	def get_data(self):
+		return {
+			"model": self.model_name,
 			"max_tokens": 1024,
-			"messages": messages,
+			"messages": self.messages,
 			"system": self.system_role
 		}
-		
-		json_data = json.dumps(data)
-		
-		self.conn.request("POST", "/v1/messages", body=json_data, headers=headers)
-		
-		response = self.conn.getresponse()
-		response_data = response.read()
 
-		self.conn.close()
-		
-		response_json = json.loads(response_data.decode("utf-8"))
-		print(response_json)
+	def get_answer(self, response_json):
 		return response_json["content"][0]["text"]
 
-	def chat(self, message):
-		# print(self.messages)
-		self.messages.append({ "role": "user", "content": message })
-		answer = self.send_request(self.model_name, self.messages)
-		self.messages.append({ "role": "assistant", "content": answer })
-		return answer
-
-openai_api = OpenAIChatAPI("")
-anthropic_api = AnthropicAPI("")
+openai_api = OpenAIChatAPI("openai", "api.openai.com", "/v1/chat/completions")
+anthropic_api = AnthropicAPI("anthropic", "api.anthropic.com", "/v1/messages")
 
 class StLlmCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
@@ -124,7 +107,7 @@ class StLlmCommand(sublime_plugin.TextCommand):
 		model_name = provider_settings.get("model", default_model)
 		system_role = provider_settings.get("system_role", default_system_role)
 		color = provider_settings.get("color", default_color)
-		color_code = provider_settings.get("color", default_color)
+		color_code = provider_settings.get("color_code", default_color_code)
 
 		if active_provider == "openai":
 			provider = openai_api
@@ -132,8 +115,8 @@ class StLlmCommand(sublime_plugin.TextCommand):
 			provider = anthropic_api
 
 		provider.api_key = api_key
-		provider.set_system_role(system_role)
 		provider.model_name = model_name
+		provider.set_system_role(system_role)
 
 		cursor_position = self.view.sel()[0].begin()
 		line_region = self.view.line(cursor_position)
@@ -143,7 +126,7 @@ class StLlmCommand(sublime_plugin.TextCommand):
 			answer = provider.chat(current_line_text)
 			key = "key_" + str(random.randint(1000, 9999))
 			self.view.add_regions(key, [line_region], "region." + color, "circle", 
-				sublime.DRAW_NO_OUTLINE, [model_name], "#2AA198") # | sublime.DRAW_SQUIGGLY_UNDERLINE
+				sublime.DRAW_NO_OUTLINE, [model_name], color_code) # | sublime.DRAW_SQUIGGLY_UNDERLINE
 			self.view.insert(edit, cursor_position, "\n\n{}\n\n".format(answer))
 			self.view.show_at_center(line_region)
 		else:
