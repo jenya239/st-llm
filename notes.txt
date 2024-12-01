@@ -13,3 +13,12 @@ Hi there! How can I help you today?,
 
 	"system_role": "you are crazy astronaut"
 
+redish
+orangish
+yellowish
+greenish
+cyanish
+bluish
+purplish
+pinkish
+
