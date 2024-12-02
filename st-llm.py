@@ -27,7 +27,11 @@ class Provider:
 			self.init_messages()
 
 	def send_request(self):
-		headers = self.get_headers()
+		headers = {
+			"Content-Type": "application/json"
+		}
+		headers.update(self.get_headers())
+
 		data = self.get_data()
 
 		json_data = json.dumps(data)
@@ -44,9 +48,9 @@ class Provider:
 
 	def chat(self, message):
 		# print(self.messages)
-		self.messages.append({ "role": "user", "content": message })
+		self.append_user_message(message)
 		answer = self.send_request()
-		self.messages.append({ "role": "assistant", "content": answer })
+		self.append_assistant_message(answer)
 		return answer
 
 class OpenAIChatAPI(Provider):
@@ -58,7 +62,6 @@ class OpenAIChatAPI(Provider):
 	def get_headers(self):
 		return {
 			"Authorization": "Bearer {}".format(self.api_key),
-			"Content-Type": "application/json"
 		}
 
 	def get_data(self):
@@ -66,6 +69,12 @@ class OpenAIChatAPI(Provider):
 			"model": self.model_name,
 			"messages": self.messages
 		}
+
+	def append_user_message(self, message):
+		self.messages.append({ "role": "user", "content": message })
+
+	def append_assistant_message(self, message):
+		self.messages.append({ "role": "assistant", "content": message })
 
 	def get_answer(self, response_json):
 		return response_json["choices"][0]["message"]["content"]
@@ -77,7 +86,6 @@ class AnthropicAPI(Provider):
 	def get_headers(self):
 		return {
 			"anthropic-version": "2023-06-01",
-			"Content-Type": "application/json",
 			"x-api-key": self.api_key,
 		}
 
@@ -89,11 +97,43 @@ class AnthropicAPI(Provider):
 			"system": self.system_role
 		}
 
+	def append_user_message(self, message):
+		self.messages.append({ "role": "user", "content": message })
+
+	def append_assistant_message(self, message):
+		self.messages.append({ "role": "assistant", "content": message })
+
 	def get_answer(self, response_json):
 		return response_json["content"][0]["text"]
 
+class GeminiAPI(Provider):
+	def init_messages(self):
+		self.messages = []
+
+	def get_headers(self):
+		self.url = "/v1beta/models/{}:generateContent?key={}".format(self.model_name, self.api_key)
+		return {}
+
+	def get_data(self):
+		return {
+			"system_instruction": {
+				"parts": { "text": self.system_role }
+			},
+			"contents": self.messages
+		}
+
+	def append_user_message(self, message):
+		self.messages.append({"role":"user", "parts":[{"text": message}]})
+
+	def append_assistant_message(self, message):
+		self.messages.append({"role":"model", "parts":[{"text": message}]})
+
+	def get_answer(self, response_json):
+		return response_json["candidates"][0]["content"]["parts"][0]["text"].rstrip('\n')
+
 openai_api = OpenAIChatAPI("openai", "api.openai.com", "/v1/chat/completions")
 anthropic_api = AnthropicAPI("anthropic", "api.anthropic.com", "/v1/messages")
+gemini_api = GeminiAPI("gemini", "generativelanguage.googleapis.com", "/v1/messages")
 
 class StLlmCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
@@ -113,6 +153,8 @@ class StLlmCommand(sublime_plugin.TextCommand):
 			provider = openai_api
 		elif active_provider == "anthropic":
 			provider = anthropic_api
+		elif active_provider == "gemini":
+			provider = gemini_api
 
 		provider.api_key = api_key
 		provider.model_name = model_name

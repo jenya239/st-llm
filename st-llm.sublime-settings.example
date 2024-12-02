@@ -11,5 +11,11 @@
 		"color": "orangish",
 		"color_code": "#B58900"
 	},
-	"active_provider": "anthropic",
+	"gemini": {
+		"key": "",
+		"model": "gemini-1.5-flash",
+		"color": "yellowish",
+		"color_code": "#859900"
+	},
+	"active_provider": "openai",
 }
