@@ -1,20 +1,36 @@
 {
+	"keys": {
+		"openai": "",
+		"anthropic": "",
+		"gemini": ""
+	},
 	"openai": {
-		"key": "",
+		"host": "api.openai.com",
+		"url": "/v1/chat/completions",
 		"model": "gpt-4o-mini",
 		"color": "cyanish",
 		"color_code": "#2AA198"
 	},
 	"anthropic": {
-		"key": "",
+		"host": "api.anthropic.com",
+		"url": "/v1/messages",
 		"model": "claude-3-5-sonnet-20241022",
 		"color": "orangish",
 		"color_code": "#B58900"
 	},
 	"gemini": {
-		"key": "",
+		"host": "generativelanguage.googleapis.com",
 		"model": "gemini-1.5-flash",
 		"color": "yellowish",
+		"color_code": "#859900"
+	},
+	"ollama": {
+		"host": "localhost",
+		"port": 11434,
+		"protocol": "http",
+		"url": "/api/chat",
+		"model": "llama3.2",
+		"color": "greenish",
 		"color_code": "#859900"
 	},
 	"active_provider": "openai",

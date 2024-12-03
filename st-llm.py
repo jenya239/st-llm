@@ -5,21 +5,28 @@ import json
 import http.client
 
 default_port = 443
+default_protocol = "https"
 default_provider = "openai"
 default_model = "gpt-4o-mini"
-default_system_role = "You are a helpful assistant. Provide very short answers with one or two lines. Always provide code blocks as raw text without surrounding them with backtricks. Please answer without backtricks"
+default_system_role = "You are a helpful assistant. Provide very short answers with one or two lines. Answer without code blocks formatting"
 default_color = "cyanish"
 default_color_code = "#2AA198"
 
 class Provider:
-	def __init__(self, name, host, url, port=default_port):
+	def __init__(self, name, settings, key):
 		self.name = name
-		self.api_key = ""
-		self.url = url
-		self.model_name = ""
-		self.conn = http.client.HTTPSConnection(host, port)
+		self.settings = settings
+		self.api_key = key
+		self.url = settings.get("url", "")
+		self.model_name = settings.get("model", default_model)
+		self.protocol = settings.get("protocol", default_protocol)
+		self.host = settings.get("host", "")
+		self.port = settings.get("port", default_port)
+		self.conn = http.client.HTTPSConnection(self.host, self.port) if self.protocol == "https" else http.client.HTTPConnection(self.host, self.port)
 		self.system_role = None
-		self.set_system_role(default_system_role)
+		self.set_system_role(settings.get("system_role", default_system_role))
+		self.color = settings.get("color", default_color)
+		self.color_code = settings.get("color_code", default_color_code)
 
 	def set_system_role(self, system_role):
 		if self.system_role != system_role:
@@ -35,14 +42,14 @@ class Provider:
 		data = self.get_data()
 
 		json_data = json.dumps(data)
-		
+
 		self.conn.request("POST", self.url, body=json_data, headers=headers)
 		
 		response = self.conn.getresponse()
 		response_data = response.read()
 
 		self.conn.close()
-		
+
 		response_json = json.loads(response_data.decode("utf-8"))
 		return self.get_answer(response_json)
 
@@ -131,35 +138,52 @@ class GeminiAPI(Provider):
 	def get_answer(self, response_json):
 		return response_json["candidates"][0]["content"]["parts"][0]["text"].rstrip('\n')
 
-openai_api = OpenAIChatAPI("openai", "api.openai.com", "/v1/chat/completions")
-anthropic_api = AnthropicAPI("anthropic", "api.anthropic.com", "/v1/messages")
-gemini_api = GeminiAPI("gemini", "generativelanguage.googleapis.com", "/v1/messages")
+class OllamaAPI(Provider):
+	def init_messages(self):
+		self.messages = [
+			{"role": "assistant", "content": self.system_role}
+		]
+
+	def get_headers(self):
+		return {}
+
+	def get_data(self):
+		return {
+			"model": self.model_name,
+			"messages": self.messages,
+			"stream": False
+		}
+
+	def append_user_message(self, message):
+		self.messages.append({ "role": "user", "content": message })
+
+	def append_assistant_message(self, message):
+		self.messages.append({ "role": "assistant", "content": message })
+
+	def get_answer(self, response_json):
+		return response_json["message"]["content"]
+
+providers = {}
+provider = None
+
+def plugin_loaded():
+	global provider, providers
+	settings = sublime.load_settings("st-llm.sublime-settings")
+	active_provider = settings.get("active_provider", default_provider)
+	keys = settings.get("keys", {})
+
+	provider_settings = settings.get(active_provider, {})
+
+	providers['openai'] = OpenAIChatAPI("openai", provider_settings, keys.get("openai", ""))
+	providers['anthropic'] = AnthropicAPI("anthropic", provider_settings, keys.get("anthropic", ""))
+	providers['gemini'] = GeminiAPI("gemini", provider_settings, keys.get("gemini", ""))
+	providers['ollama'] = OllamaAPI("ollama", provider_settings, "")
+
+	provider = providers[active_provider]
+	print("Plugin loaded successfully! active_provider = "+provider.name)
 
 class StLlmCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		settings = sublime.load_settings("st-llm.sublime-settings")
-
-		active_provider = settings.get("active_provider", default_provider)
-
-		provider_settings = settings.get(active_provider, {})
-
-		api_key = provider_settings.get("key", default_model)
-		model_name = provider_settings.get("model", default_model)
-		system_role = provider_settings.get("system_role", default_system_role)
-		color = provider_settings.get("color", default_color)
-		color_code = provider_settings.get("color_code", default_color_code)
-
-		if active_provider == "openai":
-			provider = openai_api
-		elif active_provider == "anthropic":
-			provider = anthropic_api
-		elif active_provider == "gemini":
-			provider = gemini_api
-
-		provider.api_key = api_key
-		provider.model_name = model_name
-		provider.set_system_role(system_role)
-
 		cursor_position = self.view.sel()[0].begin()
 		line_region = self.view.line(cursor_position)
 
@@ -167,8 +191,8 @@ class StLlmCommand(sublime_plugin.TextCommand):
 		if current_line_text.strip():
 			answer = provider.chat(current_line_text)
 			key = "key_" + str(random.randint(1000, 9999))
-			self.view.add_regions(key, [line_region], "region." + color, "circle", 
-				sublime.DRAW_NO_OUTLINE, [model_name], color_code) # | sublime.DRAW_SQUIGGLY_UNDERLINE
+			self.view.add_regions(key, [line_region], "region." + provider.color, "circle", 
+				sublime.DRAW_NO_OUTLINE, [provider.model_name], provider.color_code) # | sublime.DRAW_SQUIGGLY_UNDERLINE
 			self.view.insert(edit, cursor_position, "\n\n{}\n\n".format(answer))
 			self.view.show_at_center(line_region)
 		else:
