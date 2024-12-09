@@ -60,6 +60,7 @@ class Provider:
 		self.append_assistant_message(answer)
 		return answer
 
+
 class OpenAIChatAPI(Provider):
 	def init_messages(self):
 		self.messages = [
@@ -85,6 +86,7 @@ class OpenAIChatAPI(Provider):
 
 	def get_answer(self, response_json):
 		return response_json["choices"][0]["message"]["content"]
+
 
 class AnthropicAPI(Provider):
 	def init_messages(self):
@@ -113,6 +115,7 @@ class AnthropicAPI(Provider):
 	def get_answer(self, response_json):
 		return response_json["content"][0]["text"]
 
+
 class GeminiAPI(Provider):
 	def init_messages(self):
 		self.messages = []
@@ -137,6 +140,7 @@ class GeminiAPI(Provider):
 
 	def get_answer(self, response_json):
 		return response_json["candidates"][0]["content"]["parts"][0]["text"].rstrip('\n')
+
 
 class OllamaAPI(Provider):
 	def init_messages(self):
@@ -163,6 +167,36 @@ class OllamaAPI(Provider):
 	def get_answer(self, response_json):
 		return response_json["message"]["content"]
 
+
+class XAIChatAPI(Provider):
+	def init_messages(self):
+		self.messages = [
+			{"role": "system", "content": self.system_role}
+		]
+
+	def get_headers(self):
+		return {
+			"Authorization": "Bearer {}".format(self.api_key),
+		}
+
+	def get_data(self):
+		return {
+			"model": self.model_name,
+			"messages": self.messages,
+			"stream": False,
+			"temperature": 0
+		}
+
+	def append_user_message(self, message):
+		self.messages.append({ "role": "user", "content": message })
+
+	def append_assistant_message(self, message):
+		self.messages.append({ "role": "assistant", "content": message })
+
+	def get_answer(self, response_json):
+		return response_json["choices"][0]["message"]["content"]
+
+
 providers = {}
 provider = None
 
@@ -178,6 +212,7 @@ def plugin_loaded():
 	providers['anthropic'] = AnthropicAPI("anthropic", provider_settings, keys.get("anthropic", ""))
 	providers['gemini'] = GeminiAPI("gemini", provider_settings, keys.get("gemini", ""))
 	providers['ollama'] = OllamaAPI("ollama", provider_settings, "")
+	providers['xai'] = XAIChatAPI("xai", provider_settings, keys.get("xai", ""))
 
 	provider = providers[active_provider]
 	print("Plugin loaded successfully! active_provider = "+provider.name)

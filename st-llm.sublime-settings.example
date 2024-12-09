@@ -2,7 +2,8 @@
 	"keys": {
 		"openai": "",
 		"anthropic": "",
-		"gemini": ""
+		"gemini": "",
+		"xai": ""
 	},
 	"openai": {
 		"host": "api.openai.com",
@@ -32,6 +33,13 @@
 		"model": "llama3.2",
 		"color": "greenish",
 		"color_code": "#859900"
+	},
+	"xai": {
+		"host": "api.x.ai",
+		"url": "/v1/chat/completions",
+		"model": "grok-beta",
+		"color": "purplish",
+		"color_code": "#6C71C4"
 	},
 	"active_provider": "openai",
 }
